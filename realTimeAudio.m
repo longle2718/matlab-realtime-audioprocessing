@@ -31,7 +31,7 @@ while(~done)
     % Dequeue
     data = msg.content(); msg.remove();
     if (numel(data) == 0)
-        disp('empty data')
+        %disp('empty data')
         continue;
     end
     for k =1:numel(data)

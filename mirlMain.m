@@ -1,6 +1,5 @@
-% Real time audio process
-% Note that in Window 8, audio data are preprocessed, i.e. pitch auto
-% cancellation, therefore cannot get raw audio data
+% Music in real life time
+% Note: data are preprocessed in the window kernel (pitch auto cancellation)
 
 clear all; close all;
 
