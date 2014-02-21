@@ -7,7 +7,7 @@ if (idx >= obj.TotalSamples)
     return;
 end
 data = getaudiodata(obj, 'double');
-msg.push(data(idx+1:obj.TotalSamples));
-idx = obj.TotalSamples;
+msg.push(data(idx:length(data)));
+idx = length(data)+1;
 
 %toc
