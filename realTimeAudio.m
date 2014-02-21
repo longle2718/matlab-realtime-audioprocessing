@@ -1,4 +1,7 @@
-% Music in real life main file
+% Real time audio process
+% Note that in Window 8, audio data are preprocessed, i.e. pitch auto
+% cancellation, therefore cannot get raw audio data
+
 clear all; close all;
 
 addpath('../audioProcess/voicebox/');
