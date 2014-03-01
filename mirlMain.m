@@ -3,8 +3,8 @@
 
 clear all; close all;
 
-addpath('../audioProcess/voicebox/');
-addpath('C:\Users\long\Desktop\projects\cygwin\msub');
+%addpath('../voicebox/');
+%addpath('C:\Users\long\Desktop\projects\cygwin\msub');
 
 %% Parameters
 global msg idx done
