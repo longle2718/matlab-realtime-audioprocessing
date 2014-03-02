@@ -54,33 +54,44 @@ for k = 1:nKeyword
 end
 
 %% Build an HMM for each word
-nSmax = 10; % Maximum number of Markov state per word
+nM = 5;
+M = round([3:(20-3)/(nM-1):20]);
 
-model = cell(nFiller, 1);
-for k = 1:nFiller
-    modelTmp = zeros(1, nSmax-1);
-    loglik = zeros(1, nSmax-1);
-    for nS = 3:nSmax
+model = cell(nKeyword, 1);
+for k = 1:nKeyword
+    disp(['==== keyword ' num2str(k) ' ====']);
+    modelTmp = cell(1, nM);
+    loglikHist = cell(1, nM);
+    for l = 1:nM
         % Gaussian observation assumption
-        nO = size(fillerC{k}, 2);
-        mu = repmat(mean(fillerC{k})', 1, nS);
-        Sigma = reshape(repmat(cov(fillerC{k}), 1, nS), nO, nO, nS);
+        nO = size(keywordC{k}, 2);
+        mu = repmat(mean(keywordC{k})', 1, M(l));
+        Sigma = reshape(repmat(cov(keywordC{k}), 1, M(l)), nO, nO, M(l));
         emission0 = condGaussCpdCreate(mu, Sigma); 
         % HMM fit with gaussian observation
-        pi0 = [1 zeros(1, nS-1)]; 
+        pi0 = [1 zeros(1, M(l)-1)]; 
         % Each time step is inc/fs real time
-        trans0 = triu(toeplitz([1-1/5 1/5 zeros(1, nS-2)])); trans0(end, end) = 1;
+        trans0 = triu(toeplitz([1-1/5 1/5 zeros(1, M(l)-2)])); trans0(end, end) = 1;
         
         % ML over dynamic, MAP over output process
         emissionPrior = emission0.prior;
-        piPrior = zeros(nS, 1);
-        transPrior = zeros(nS, nS);
+        piPrior = zeros(M(l), 1);
+        transPrior = zeros(M(l), M(l));
         
-        [modelTmp(nS-1), loglik(nS-1)] = hmmFit(fillerC{k}', nS, 'gauss','verbose',true,'maxIter',500,...
+        [modelTmp{l}, loglikHist{l}] = hmmFit(keywordC{k}', M(l), 'gauss','verbose',true,'maxIter',500,...
             'pi0', pi0, 'trans0', trans0, 'emission0', emission0, ...
             'piPrior', piPrior, 'transPrior', transPrior, 'emissionPrior', emissionPrior);
     end
     % compute and plot AIC/BIC scores & test likelihoods for all models 
-    [~, idx] = max(loglik);
-    model(k) = modelTmp(idx);
+    AIC = zeros(1, nM);
+    BIC = zeros(1, nM);
+    for l = 1:nM
+        d = M(l) + M(l)^2 + nO*M(l) + nO^2*M(l);
+        T = size(keywordC{k},1);
+        AIC(l) = loglikHist{l}(end) - d;
+        BIC(l) = loglikHist{l}(end) - d*log(T)/2;
+    end
+    [~, idx] = max(BIC);
+    disp(['Selected model with ' num2str(M(idx)) ' states'])
+    model{k} = modelTmp{idx};
 end
