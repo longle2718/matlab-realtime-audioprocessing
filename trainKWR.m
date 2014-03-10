@@ -25,22 +25,23 @@ for k = 1:numfiles
 	[keyword{k}, tmpFs] = audioread(['speech/train/' files(k).name]);
     keyword{k} = keyword{k}(:,1);
 	keyword{k} = resample(keyword{k}, fs, tmpFs);
+    keyword{k} = keyword{k} + 2e-3*randn(size(keyword{k}));
 end
 
 % Feature extraction
 nKeyword = numel(keyword);
 keywordC = cell(nKeyword, 1);
 for k = 1:nKeyword
-    % 12 mel cepstrum coefficients and first order derivative, i.e. delta
-	keywordC{k} = melcepst(keyword{k}, fs, '', 12, floor(3*log(fs)), win, inc);
+    % mel cepstrum coefficients and first order derivative, i.e. delta
+	keywordC{k} = melcepst(keyword{k}, fs, '', 8, floor(3*log(fs)), win, inc);
 end
 
 %% Build an HMM for each word
-M = round([3:5]);
+M = round([3:6]);
 nM = numel(M);
 
 model = cell(nKeyword, 1);
-for k = 17
+for k = 1:nKeyword
     disp(['==== keyword ' num2str(k) ' ====']);
     modelTmp = cell(1, nM);
     loglikHist = cell(1, nM);
@@ -77,8 +78,17 @@ for k = 17
     disp(['Selected model with ' num2str(M(idx)) ' states'])
     model{k} = modelTmp{idx};
 end
-
 save allModels.mat model
+
+% Simple test for the word 'key'
+trainScore = zeros(nKeyword, nKeyword);
+for k = 1:nKeyword
+    for l = 1:nKeyword
+        trainScore(k, l) = hmmLogprob(model{k}, keywordC{l}');
+    end
+end
+[~, idx] = max(trainScore, [], 2);
+probRecog = mean(idx == [1:nKeyword]')
 
 %% Test built model
 files = dir('speech/test/keyword/*.wav');
@@ -89,11 +99,10 @@ for k = 1:numfiles
     testword{k} = testword{k}(:,1);
 	testword{k} = resample(testword{k}, fs, tmpFs);
 end
-% Feature extraction
 nTestword = numel(testword);
 testwordC = cell(nTestword, 1);
+testScore = zeros(nTestword, 1);
 for k = 1:nTestword
-    % 12 mel cepstrum coefficients and first order derivative, i.e. delta
-	testwordC{k} = melcepst(testword{k}, fs, '', 12, floor(3*log(fs)), win, inc);
-    hmmLogprob(model{17}, testwordC{k}')
+	testwordC{k} = melcepst(testword{k}, fs, '', 8, floor(3*log(fs)), win, inc);
+    testScore(k) = hmmLogprob(model{17}, testwordC{k}');
 end
