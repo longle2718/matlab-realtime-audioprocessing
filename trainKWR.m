@@ -76,3 +76,6 @@ for k = 1:nKeyword
     disp(['Selected model with ' num2str(M(idx)) ' states'])
     model{k} = modelTmp{idx};
 end
+
+%hmmLogprob(model{1}, keywordC{1}')
+save allModels.mat model
