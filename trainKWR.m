@@ -19,9 +19,9 @@ inc = 10e-3*fs;
 files = dir('speech/train/*.mp3');
 numfiles = length(files);
 keyword = cell(1,numfiles);
-lab = cell(numfiles, 1);
+labTrain = cell(numfiles, 1);
 for k = 1:numfiles
-    lab{k} = files(k).name(1:strfind(files(k).name,'.')-1);
+    labTrain{k} = files(k).name(1:strfind(files(k).name,'.')-1);
 	[keyword{k}, tmpFs] = audioread(['speech/train/' files(k).name]);
     keyword{k} = keyword{k}(:,1);
 	keyword{k} = resample(keyword{k}, fs, tmpFs);
@@ -91,18 +91,27 @@ end
 probRecog = mean(idx == [1:nKeyword]')
 
 %% Test built model
-files = dir('speech/test/keyword/*.wav');
+files = dir('speech/test/*.wav');
 numfiles = length(files);
 testword = cell(1,numfiles);
+labTest = cell(numfiles, 1);
 for k = 1:numfiles
-	[testword{k}, tmpFs] = wavread(['speech/test/keyword/' files(k).name]);
+    labTest{k} = files(k).name(1:strfind(files(k).name,'.')-1);
+	[testword{k}, tmpFs] = wavread(['speech/test/' files(k).name]);
     testword{k} = testword{k}(:,1);
 	testword{k} = resample(testword{k}, fs, tmpFs);
 end
+
 nTestword = numel(testword);
 testwordC = cell(nTestword, 1);
-testScore = zeros(nTestword, 1);
 for k = 1:nTestword
-	testwordC{k} = melcepst(testword{k}, fs, '', 8, floor(3*log(fs)), win, inc);
-    testScore(k) = hmmLogprob(model{17}, testwordC{k}');
+    testwordC{k} = melcepst(testword{k}, fs, '', 8, floor(3*log(fs)), win, inc);    
 end
+
+testScore = zeros(nKeyword, nTestword);
+for k = 1:nKeyword
+    for l = 1:nTestword
+        testScore(k, l) = hmmLogprob(model{k}, testwordC{l}');
+    end
+end
+[~, idx] = max(max(testScore, [], 2));
