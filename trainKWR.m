@@ -1,4 +1,4 @@
-% Train a continuous speech recognition (CSR) keyword-filler network
+% Train (and test) a continuous speech recognition (CSR) keyword-filler network
 % for keyword recognition (KWR)
 %
 % Long Le
@@ -16,30 +16,31 @@ fs = 8e3;
 win = 13e-3*fs; % == nfft unless explicitly specified 
 inc = 10e-3*fs;
 
-fnames = dir('speech/train/*.mp3');
-numfids = length(fnames);
-keyword = cell(1,numfids);
-for k = 1:numfids
-    tmp = ['speech/train/' fnames(k).name];
-	[keyword{k}, tmpFs] = audioread(tmp);
+files = dir('speech/train/*.mp3');
+numfiles = length(files);
+keyword = cell(1,numfiles);
+lab = cell(numfiles, 1);
+for k = 1:numfiles
+    lab{k} = files(k).name(1:strfind(files(k).name,'.')-1);
+	[keyword{k}, tmpFs] = audioread(['speech/train/' files(k).name]);
     keyword{k} = keyword{k}(:,1);
 	keyword{k} = resample(keyword{k}, fs, tmpFs);
 end
 
-%% Feature extraction
+% Feature extraction
 nKeyword = numel(keyword);
 keywordC = cell(nKeyword, 1);
 for k = 1:nKeyword
     % 12 mel cepstrum coefficients and first order derivative, i.e. delta
-	keywordC{k} = melcepst(keyword{k}, fs, 'd', 12, floor(3*log(fs)), win, inc);
+	keywordC{k} = melcepst(keyword{k}, fs, '', 12, floor(3*log(fs)), win, inc);
 end
 
 %% Build an HMM for each word
-nM = 5;
-M = round([3:(20-3)/(nM-1):20]);
+M = round([3:5]);
+nM = numel(M);
 
 model = cell(nKeyword, 1);
-for k = 1:nKeyword
+for k = 17
     disp(['==== keyword ' num2str(k) ' ====']);
     modelTmp = cell(1, nM);
     loglikHist = cell(1, nM);
@@ -63,7 +64,7 @@ for k = 1:nKeyword
             'pi0', pi0, 'trans0', trans0, 'emission0', emission0, ...
             'piPrior', piPrior, 'transPrior', transPrior, 'emissionPrior', emissionPrior);
     end
-    % compute and plot AIC/BIC scores & test likelihoods for all models 
+    % compute and plot AIC/BIC scores likelihoods for all models 
     AIC = zeros(1, nM);
     BIC = zeros(1, nM);
     for l = 1:nM
@@ -77,5 +78,22 @@ for k = 1:nKeyword
     model{k} = modelTmp{idx};
 end
 
-%hmmLogprob(model{1}, keywordC{1}')
 save allModels.mat model
+
+%% Test built model
+files = dir('speech/test/keyword/*.wav');
+numfiles = length(files);
+testword = cell(1,numfiles);
+for k = 1:numfiles
+	[testword{k}, tmpFs] = wavread(['speech/test/keyword/' files(k).name]);
+    testword{k} = testword{k}(:,1);
+	testword{k} = resample(testword{k}, fs, tmpFs);
+end
+% Feature extraction
+nTestword = numel(testword);
+testwordC = cell(nTestword, 1);
+for k = 1:nTestword
+    % 12 mel cepstrum coefficients and first order derivative, i.e. delta
+	testwordC{k} = melcepst(testword{k}, fs, '', 12, floor(3*log(fs)), win, inc);
+    hmmLogprob(model{17}, testwordC{k}')
+end
