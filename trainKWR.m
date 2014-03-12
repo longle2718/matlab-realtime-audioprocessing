@@ -38,7 +38,7 @@ for k = 1:nKeyword
 end
 
 %% Build an HMM for each word
-M = round([3:6]);
+M = round([3:7]);
 nM = numel(M);
 
 model = cell(nKeyword, 1);
@@ -79,11 +79,11 @@ for k = 1:nKeyword
     [~, idx] = max(BIC);
     disp(['Selected model with ' num2str(M(idx)) ' states'])
     model{k} = modelTmp{idx};
-    modelScore{k} = BIC{idx};
+    modelScore{k} = BIC(idx);
 end
 save allModels.mat model
 
-%% Simple test for the word 'key'
+% Simple test for the word 'key'
 trainScore = zeros(nKeyword, nKeyword);
 for k = 1:nKeyword
     wrapfun = @(x) hmmLogprob(model{k}, x) - ...
@@ -95,3 +95,37 @@ end
 [~, idx] = max(trainScore, [], 2);
 probRecog = mean(idx == [1:nKeyword]')
 find(idx ~=  [1:nKeyword]')
+
+%% Performance evaluation on test data
+dirnames = dirs('TIDIGIT_adults_crop/test/');
+nTestword = numel(dirnames);
+testword = cell(nTestword, 1);
+testwordC = cell(nTestword, 1); % Cepstrum
+labTest = cell(nTestword, 1); % Label
+nO = 8;
+for k = 1:nTestword
+    labTest{k} = dirnames(k);
+    files = dir(['TIDIGIT_adults_crop/test/' dirnames{k} '/*.wav']);
+    numfiles = numel(files);
+    testword{k} = cell(numfiles, 1);
+    testwordC{k} = cell(numfiles, 1);
+    for l = 1:numfiles
+        [tmpY, tmpFs] = audioread(['TIDIGIT_adults_crop/test/' dirnames{k} '/' files(l).name]);
+        tmpY = resample(tmpY, fs, tmpFs);
+        %tmpY = tmpY + 2e-3*randn(size(tmpY));
+        testword{k}{l} = tmpY(:,1);
+        testwordC{k}{l} = melcepst(tmpY(:,1), fs, '', nO, floor(3*log(fs)), win, inc)'; % d x T
+    end
+end
+
+testScore = zeros(nTestword, nTestword);
+for k = 1:nTestword
+    wrapfun = @(x) hmmLogprob(model{k}, x) - ...
+        (model{k}.nstates + model{k}.nstates^2 + nO*model{k}.nstates + nO^2*model{k}.nstates)*log(size(x, 2))/2;
+    for l = 1:nTestword
+        testScore(k, l) = sum(cellfun(wrapfun, testwordC{l}));
+    end
+end
+[~, idx] = max(testScore, [], 2);
+probRecog = mean(idx == [1:nTestword]')
+find(idx ~=  [1:nTestword]')
