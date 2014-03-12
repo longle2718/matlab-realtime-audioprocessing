@@ -22,7 +22,7 @@ keyword = cell(nKeyword, 1);
 keywordC = cell(nKeyword, 1); % Cepstrum
 labTrain = cell(nKeyword, 1); % Label
 nO = 8;
-for k = 1%:nKeyword
+for k = 1:nKeyword
     labTrain{k} = dirnames(k);
     files = dir(['TIDIGIT_adults_crop/train/' dirnames{k} '/*.wav']);
     numfiles = numel(files);
@@ -42,7 +42,8 @@ M = round([3:6]);
 nM = numel(M);
 
 model = cell(nKeyword, 1);
-for k = 1%:nKeyword
+modelScore = cell(nKeyword, 1);
+for k = 1:nKeyword
     disp(['==== keyword ' num2str(k) ' ====']);
     modelTmp = cell(1, nM);
     loglikHist = cell(1, nM);
@@ -78,16 +79,19 @@ for k = 1%:nKeyword
     [~, idx] = max(BIC);
     disp(['Selected model with ' num2str(M(idx)) ' states'])
     model{k} = modelTmp{idx};
+    modelScore{k} = BIC{idx};
 end
 save allModels.mat model
 
-% Simple test for the word 'key'
+%% Simple test for the word 'key'
 trainScore = zeros(nKeyword, nKeyword);
 for k = 1:nKeyword
-    wrapfun = @(x) hmmLogprob(model{k}, x);
+    wrapfun = @(x) hmmLogprob(model{k}, x) - ...
+        (model{k}.nstates + model{k}.nstates^2 + nO*model{k}.nstates + nO^2*model{k}.nstates)*log(size(x, 2))/2;
     for l = 1:nKeyword
         trainScore(k, l) = sum(cellfun(wrapfun, keywordC{l}));
     end
 end
 [~, idx] = max(trainScore, [], 2);
 probRecog = mean(idx == [1:nKeyword]')
+find(idx ~=  [1:nKeyword]')
