@@ -83,10 +83,10 @@ for k = 1:nKeyword
 end
 save allModels.mat model
 
-% Simple test for the word 'key'
+% Simple test on training data
 trainScore = zeros(nKeyword, nKeyword);
 for k = 1:nKeyword
-    wrapfun = @(x) hmmLogprob(model{k}, x) - ...
+    wrapfun = @(x) hmmMap(model{k}, x) - ...
         (model{k}.nstates + model{k}.nstates^2 + nO*model{k}.nstates + nO^2*model{k}.nstates)*log(size(x, 2))/2;
     for l = 1:nKeyword
         trainScore(k, l) = sum(cellfun(wrapfun, keywordC{l}));
@@ -120,7 +120,7 @@ end
 
 testScore = zeros(nTestword, nTestword);
 for k = 1:nTestword
-    wrapfun = @(x) hmmLogprob(model{k}, x) - ...
+    wrapfun = @(x) hmmMap(model{k}, x) - ...
         (model{k}.nstates + model{k}.nstates^2 + nO*model{k}.nstates + nO^2*model{k}.nstates)*log(size(x, 2))/2;
     for l = 1:nTestword
         testScore(k, l) = sum(cellfun(wrapfun, testwordC{l}));
