@@ -6028,6 +6028,57 @@ index e734672..1a460a7 100644
 +if __name__ == '__main__':
 +    generate_rst()
 +    print("Finished generate chX.rst!")
+diff --git a/toolbox/LatentVariableModels/hmm/hmmInferNodes.m b/toolbox/LatentVariableModels/hmm/hmmInferNodes.m
+index 096f1cf..1c2fd5a 100644
+--- a/toolbox/LatentVariableModels/hmm/hmmInferNodes.m
++++ b/toolbox/LatentVariableModels/hmm/hmmInferNodes.m
+@@ -1,15 +1,14 @@
+ function [gamma, logp, alpha, beta, B] = hmmInferNodes(model, X)
+ % logp = log p(X | model)
+-% alpha(i, t) = log p(S(t)=i , X(:, 1:t)    (filtered)
+-% beta(i,t) = log p(X(:, t+1:T) | S(t=i))
+-% gamma(i,t)  = log p(S(t)=i | X(:, 1:T))   (smoothed)
++% alpha(i, t) = p(S(t)=i | X(:, 1:t)    (filtered)
++% beta(i,t) propto p(X(:, t+1:T) | S(t=i))
++% gamma(i,t)  = p(S(t)=i | X(:, 1:T))   (smoothed)
+ % B - soft evidence
+ %*** X must be a single sequence of size d-by-T ***
+ %
+ 
+ % This file is from pmtk3.googlecode.com
+ 
+-% Edit: Long Le
+ pi            = model.pi;
+ A             = model.A;
+ logB          = mkSoftEvidence(model.emission, X); 
+diff --git a/toolbox/LatentVariableModels/hmm/hmmMap.m b/toolbox/LatentVariableModels/hmm/hmmMap.m
+index 57b87df..7ed4604 100644
+--- a/toolbox/LatentVariableModels/hmm/hmmMap.m
++++ b/toolbox/LatentVariableModels/hmm/hmmMap.m
+@@ -1,4 +1,4 @@
+-function [loglik, path] = hmmMap(model, X)
++function path = hmmMap(model, X)
+ % Find the most-probable (Viterbi) path through the HMM state trellis. 
+ %% Inputs:
+ % model - a struct as returned by e.g. hmmFit, which must contain
+@@ -12,8 +12,6 @@ function [loglik, path] = hmmMap(model, X)
+ 
+ % This file is from pmtk3.googlecode.com
+ 
+-% Edit: Long Le
+-
+ pi = model.pi;
+ A  = model.A;
+ logB  = mkSoftEvidence(model.emission, X);
+@@ -21,7 +19,7 @@ logB  = mkSoftEvidence(model.emission, X);
+ % this C code is a bit ugly
+ 
+ % Use Dan Ellis's C code instead
+-[loglik, path] = viterbi_path(pi, A, exp(logB));
++path = viterbi_path(pi, A, exp(logB));
+ %assert(isequal(path, path))
+ 
+ end
 diff --git a/toolbox/LatentVariableModels/hmm/sub/hmmComputeTwoSliceSum.c b/toolbox/LatentVariableModels/hmm/sub/hmmComputeTwoSliceSum.c
 new file mode 100644
 index 0000000..8a823ea
@@ -6135,24 +6186,25 @@ index 0000000..8a823ea
 +    return;  
 +}
 diff --git a/toolbox/LatentVariableModels/hmm/sub/hmmComputeTwoSliceSum.m b/toolbox/LatentVariableModels/hmm/sub/hmmComputeTwoSliceSum.m
-index 958d7d9..d789bf0 100644
+index a283e4f..d789bf0 100644
 --- a/toolbox/LatentVariableModels/hmm/sub/hmmComputeTwoSliceSum.m
 +++ b/toolbox/LatentVariableModels/hmm/sub/hmmComputeTwoSliceSum.m
 @@ -10,8 +10,8 @@ function xiSummed = hmmComputeTwoSliceSum(alpha, beta, A, B)
  % alpha, and beta are computed using e.g. hmmFwdBack, A is the state
  % transition matrix, whose *rows* sum to one, and B is the soft evidence. 
  % 
--% alpha(j, t)      = log p( S(t) = j  | y(1:t)    )   (KxT) 
+-% alpha(j, t)      = log p( S(t) = j  , y(1:t)    )   (KxT) 
 -% beta (j, t)      = log p( y(t+1:T)  | S(t)   = j)   (KxT)
 +% alpha(j, t)      = p( S(t) = j  | y(1:t)    )   (KxT) 
 +% beta (j, t) propto p( y(t+1:T)  | S(t)   = j)   (KxT)
  % A    (i, j)      = p( S(t) = j  | S(t-1) = i)   (KxK) 
  % B    (j, t)      = p( y(t)      | S(t)   = j)   (KxT)
  % 
-@@ -23,20 +23,11 @@ function xiSummed = hmmComputeTwoSliceSum(alpha, beta, A, B)
+@@ -23,21 +23,11 @@ function xiSummed = hmmComputeTwoSliceSum(alpha, beta, A, B)
  
  % This file is from pmtk3.googlecode.com
  
+-% Author: Long Le
 -% Go to log space
 -A = log(A);
 -B = log(B);
@@ -6186,18 +6238,19 @@ new file mode 100644
 index 0000000..9b526af
 Binary files /dev/null and b/toolbox/LatentVariableModels/hmm/sub/hmmComputeTwoSliceSum.mexw64 differ
 diff --git a/toolbox/LatentVariableModels/hmm/sub/hmmFilter.m b/toolbox/LatentVariableModels/hmm/sub/hmmFilter.m
-index 44e34e3..e5d0316 100644
+index d54d9d7..e5d0316 100644
 --- a/toolbox/LatentVariableModels/hmm/sub/hmmFilter.m
 +++ b/toolbox/LatentVariableModels/hmm/sub/hmmFilter.m
-@@ -7,24 +7,28 @@ function [loglik, alpha] = hmmFilter(initDist, transmat, softev)
+@@ -7,25 +7,28 @@ function [loglik, alpha] = hmmFilter(initDist, transmat, softev)
  %
  % OUTPUT
  % loglik = log p(y(1:T))
--% alpha(i,t)  = log p(S(t)=i| y(1:t))
+-% alpha(i,t)  = log p(S(t)=i, y(1:t))
 +% alpha(i,t)  = p(S(t)=i| y(1:t))
  
  % This file is from pmtk3.googlecode.com
  
+-% Author: Long Le
 -% Go to log space
 -softev = log(softev);
 -transmat = log(transmat);
@@ -6231,10 +6284,19 @@ index 44e34e3..e5d0316 100644
  
  end
 diff --git a/toolbox/LatentVariableModels/hmm/sub/hmmFitEm.m b/toolbox/LatentVariableModels/hmm/sub/hmmFitEm.m
-index 3e8abf1..1c16fa6 100644
+index 4c56d35..1c16fa6 100644
 --- a/toolbox/LatentVariableModels/hmm/sub/hmmFitEm.m
 +++ b/toolbox/LatentVariableModels/hmm/sub/hmmFitEm.m
-@@ -68,9 +68,9 @@ for i=1:nobs
+@@ -5,8 +5,6 @@ function [model, loglikHist] = hmmFitEm(data, nstates, type, varargin)
+ 
+ % This file is from pmtk3.googlecode.com
+ 
+-% Edit: Long Le
+-
+ if ~iscell(data)
+     if isvector(data) % scalar time series
+         data = rowvec(data);
+@@ -70,9 +68,9 @@ for i=1:nobs
      [gamma, alpha, beta, logp] = hmmFwdBack(pi, A, Bi);
      loglik                     = loglik + logp; 
      xiSummed                   = hmmComputeTwoSliceSum(alpha, beta, A, Bi);
@@ -6536,22 +6598,28 @@ index 0000000..b20bdce
 +    return;
 +}
 diff --git a/toolbox/LatentVariableModels/hmm/sub/hmmFwdBack.m b/toolbox/LatentVariableModels/hmm/sub/hmmFwdBack.m
-index bc5e095..7c2989f 100644
+index d85442b..7c2989f 100644
 --- a/toolbox/LatentVariableModels/hmm/sub/hmmFwdBack.m
 +++ b/toolbox/LatentVariableModels/hmm/sub/hmmFwdBack.m
-@@ -7,8 +7,8 @@ function [gamma, alpha, beta, loglik] = hmmFwdBack(initDist, transmat, softev)
+@@ -6,9 +6,9 @@ function [gamma, alpha, beta, loglik] = hmmFwdBack(initDist, transmat, softev)
+ % softev(i,t) = p(y(t)| S(t)=i)
  %
  % OUTPUT
- % gamma(i,t) = p(S(t)=i | y(1:T))
--% alpha(i,t)  = log p(S(t)=i| y(1:t))
+-% gamma(i,t) = log p(S(t)=i | y(1:T))
+-% alpha(i,t)  = log p(S(t)=i, y(1:t))
 -% beta(i,t) = log p(y(t+1:T) | S(t)=i)
++% gamma(i,t) = p(S(t)=i | y(1:T))
 +% alpha(i,t)  = p(S(t)=i| y(1:t))
 +% beta(i,t) propto p(y(t+1:T) | S(t=i))
  % loglik = log p(y(1:T))
  
  % This file is from pmtk3.googlecode.com
-@@ -22,28 +22,16 @@ function [gamma, alpha, beta, loglik] = hmmFwdBack(initDist, transmat, softev)
+@@ -19,31 +19,19 @@ function [gamma, alpha, beta, loglik] = hmmFwdBack(initDist, transmat, softev)
+ %PMTKauthor Guillaume Alain
+ %PMTKmex
  
+-% Author: Long Le
++
  [loglik, alpha] = hmmFilter(initDist, transmat, softev);
  beta = hmmBackwards(transmat, softev);
 -
@@ -6599,3 +6667,113 @@ old mode 100755
 new mode 100644
 index 4697047..51b5336
 Binary files a/toolbox/LatentVariableModels/hmm/sub/hmmViterbiC.mexw64 and b/toolbox/LatentVariableModels/hmm/sub/hmmViterbiC.mexw64 differ
+diff --git a/toolbox/LatentVariableModels/hmm/sub/viterbi_path.m b/toolbox/LatentVariableModels/hmm/sub/viterbi_path.m
+index 4fd5f10..84988a3 100644
+--- a/toolbox/LatentVariableModels/hmm/sub/viterbi_path.m
++++ b/toolbox/LatentVariableModels/hmm/sub/viterbi_path.m
+@@ -1,4 +1,4 @@
+-function [loglik, path] = viterbi_path(prior, transmat, obslik)
++function path = viterbi_path(prior, transmat, obslik)
+ % VITERBI Find the most-probable (Viterbi) path through the HMM state trellis.
+ % path = viterbi(prior, transmat, obslik)
+ %
+@@ -8,7 +8,6 @@ function [loglik, path] = viterbi_path(prior, transmat, obslik)
+ % obslik(i,t) = Pr(y(t) | Q(t)=i)
+ %
+ % Outputs:
+-% loglik
+ % path(t) = q(t), where q1 ... qT is the argmax of the above expression.
+ 
+ %PMTKauthor Kevin Murphy, Dan Ellis
+@@ -16,30 +15,74 @@ function [loglik, path] = viterbi_path(prior, transmat, obslik)
+ % delta(j,t) = prob. of the best sequence of length t-1 and then going to state j, and O(1:t)
+ % psi(j,t) = the best predecessor state, given that we ended up in state j at t
+ 
+-% author: Long Le
++scaled = 1;
++
+ T = size(obslik, 2);
+ prior = prior(:);
+ Q = length(prior);
+ 
+-% Go to log space
+-obslik = log(obslik);
+-transmat = log(transmat);
+-prior = log(prior);
++delta = zeros(Q,T);
++psi = zeros(Q,T);
++path = zeros(1,T);
++scale = ones(1,T);
++
++
++%{
++have_viterbi_helper = (exist('viterbi_path_helper') == 3);
+ 
+-delta = zeros(Q, T);
+-psi = zeros(Q, T); % backtrace
+-path = zeros(1, T);
++if ~have_viterbi_helper && exist('viterbi_path_helper.c','file')
++  % Attempt to compile mex
++  try
++    mypwd = pwd();
++    cd(fileparts(which('viterbi_path')));
++    mex('viterbi_path_helper.c');
++    cd(mypwd);
++  catch me
++    % ignore
++  end
++  have_viterbi_helper = (exist('viterbi_path_helper') == 3);
++end
++%}
++
++if false % have_viterbi_helper
++  [delta, psi, scale] = viterbi_path_helper(obslik, prior, transmat, scaled);
++else
++  
++  t=1;
++  delta(:,t) = prior .* obslik(:,t);
++  if scaled
++    [delta(:,t), n] = normalise(delta(:,t));
++    scale(t) = 1/n;
++  end
++  psi(:,t) = 0; % arbitrary value, since there is no predecessor to t=1
+ 
+-delta(:,1) = prior + obslik(:,1);
+-for l = 2:T
+-    for k = 1:Q
+-        [delta(k,l), psi(k,l)] = max(delta(:, l-1) + transmat(:, k) + obslik(k, l));
++  for t=2:T
++    for j=1:Q
++      [delta(j,t), psi(j,t)] = max(delta(:,t-1) .* transmat(:,j));
++      delta(j,t) = delta(j,t) * obslik(j,t);
++    end
++    if scaled
++      [delta(:,t), n] = normalise(delta(:,t));
++      scale(t) = 1/n;
+     end
++  end
++
++end
++
++[p, path(T)] = max(delta(:,T));
++for t=T-1:-1:1
++  path(t) = psi(path(t+1),t+1);
+ end
+-% Roll back state sequence
+-[loglik, path(T)] = max(delta(:,T));
+-for l = T:-1:2
+-    path(l-1) = psi(path(l), l);
++
++% If scaled==0, p = prob_path(best_path)
++% If scaled==1, p = Pr(replace sum with max and proceed as in the scaled forwards algo)
++% Both are different from p(data) as computed using the sum-product (forwards) algorithm
++
++if 0
++if scaled
++  loglik = -sum(log(scale));
++  %loglik = prob_path(prior, transmat, obslik, path);
++else
++  loglik = log(p);
+ end
+-    
+ end
