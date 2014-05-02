@@ -12,7 +12,7 @@ msg = CQueue();
 idx = 1;
 done = false;
 recTime = 5; % seconds
-fs = 8000;
+fs = 22050;
 nBits = 8;
 nChannels = 1;
 figure;

@@ -4,8 +4,8 @@
 
 clear all; close all;
 
-addpath('../audioProcess/voicebox/');
-addpath('C:\Users\long\Desktop\projects\cygwin\msub');
+%addpath('../voicebox/');
+%addpath('C:\Users\long\Desktop\projects\cygwin\msub');
 
 %% Parameters
 global msg idx done
@@ -35,12 +35,12 @@ while(~done)
         continue;
     end
     for k =1:numel(data)
-        dataDFT = fft(data{k});
-        N = length(dataDFT);
+        N = length(data{k});
+        dataDFT = fft(data{k})/N;
         dataDFT = dataDFT(1:N/2+1);
         freq = 0:fs/N:fs/2;
         plot(freq, abs(dataDFT)); grid on
-        axis([0 fs/2 0 1]);
+        axis([0 fs/2 0 0.1]);
         xlabel('Frequency (Hz)'); ylabel('Magnitude')
         drawnow;
     end
